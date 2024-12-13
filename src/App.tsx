@@ -1,26 +1,26 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+// src/App.tsx
+import React, { useEffect } from "react";
+import NavBar from "./components/NavBar";
+import AppRoutes from "./routes/AppRoutes";
+import { useUIStore } from "./store/useUIStore";
 
-function App() {
+const App: React.FC = () => {
+  const { darkMode } = useUIStore();
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="bg-gray-100 dark:bg-gray-900 min-h-screen transition-colors">
+      <NavBar />
+      <AppRoutes />
     </div>
   );
-}
+};
 
 export default App;
