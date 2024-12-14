@@ -21,6 +21,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
     reason: "",
     status: "Scheduled",
   });
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,7 +132,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
             className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           >
             <option value="">Select Doctor</option>
-            {doctors.map((doctor) => (
+            {doctors?.map((doctor) => (
               <option key={doctor._id} value={doctor._id}>
                 Dr. {doctor.firstName} {doctor.lastName} - {doctor.specialty}
               </option>
@@ -202,39 +203,48 @@ const ReceptionAppointmentsPage: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {appointments.map((appointment) => (
-            <tr key={appointment._id}>
-              <td className="border p-2 dark:border-gray-600">
-                {appointment.patient}
-              </td>
-              <td className="border p-2 dark:border-gray-600">
-                {appointment.doctor}
-              </td>
-              <td className="border p-2 dark:border-gray-600">
-                {new Date(appointment.date).toLocaleString()}
-              </td>
-              <td className="border p-2 dark:border-gray-600">
-                {appointment.reason}
-              </td>
-              <td className="border p-2 dark:border-gray-600">
-                {appointment.status}
-              </td>
-              <td className="border p-2 dark:border-gray-600">
-                <button
-                  onClick={() => handleEdit(appointment)}
-                  className="mr-2 bg-yellow-500 text-white p-1 rounded hover:bg-yellow-600"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(appointment._id)}
-                  className="bg-red-500 text-white p-1 rounded hover:bg-red-600"
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
+          {appointments.map((appointment) => {
+            const patient = patients.find((p) => p._id === appointment.patient);
+            const doctor = doctors.find((d) => d._id === appointment.doctor);
+
+            return (
+              <tr key={appointment._id}>
+                <td className="border p-2 dark:border-gray-600">
+                  {patient
+                    ? `${patient.firstName} ${patient.lastName}`
+                    : "Unknown"}
+                </td>
+                <td className="border p-2 dark:border-gray-600">
+                  {doctor
+                    ? `Dr. ${doctor.firstName} ${doctor.lastName}`
+                    : "Unknown"}
+                </td>
+                <td className="border p-2 dark:border-gray-600">
+                  {new Date(appointment.date).toLocaleString()}
+                </td>
+                <td className="border p-2 dark:border-gray-600">
+                  {appointment.reason}
+                </td>
+                <td className="border p-2 dark:border-gray-600">
+                  {appointment.status}
+                </td>
+                <td className="border p-2 dark:border-gray-600">
+                  <button
+                    onClick={() => handleEdit(appointment)}
+                    className="mr-2 bg-yellow-500 text-white p-1 rounded hover:bg-yellow-600"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(appointment._id)}
+                    className="bg-red-500 text-white p-1 rounded hover:bg-red-600"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
           {appointments.length === 0 && (
             <tr>
               <td colSpan={6} className="text-center p-4">

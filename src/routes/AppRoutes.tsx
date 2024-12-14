@@ -3,7 +3,6 @@ import React from "react";
 import { Route, Routes } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import RoleProtectedRoute from "../components/RoleProtectedRoute";
-
 import LoginPage from "../pages/LoginPage";
 import Dashboard from "../pages/Dashboard";
 import AdminDoctorPage from "../pages/AdminDoctorPage";
