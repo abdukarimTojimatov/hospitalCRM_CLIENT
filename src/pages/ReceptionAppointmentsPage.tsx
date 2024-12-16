@@ -50,12 +50,24 @@ const ReceptionAppointmentsPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [filters, setFilters] = useState({
+    status: "",
+    patientId: "",
+    doctorId: "",
+    startDate: "",
+    endDate: "",
+  });
   // Fetch appointments from the backend
   const fetchAppointments = async (page = 1, limit = 10) => {
     try {
       const data = await getAppointments({
         page,
         limit,
+        status: filters.status,
+        patientId: filters.patientId,
+        doctorId: filters.doctorId,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
       });
       setAppointmentsData(data);
     } catch (err: any) {
@@ -249,6 +261,16 @@ const ReceptionAppointmentsPage: React.FC = () => {
     });
   };
 
+  const clearFilters = () => {
+    setFilters({
+      status: "",
+      patientId: "",
+      doctorId: "",
+      startDate: "",
+      endDate: "",
+    });
+    fetchAppointments(1, pageSize);
+  };
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg">
@@ -264,6 +286,140 @@ const ReceptionAppointmentsPage: React.FC = () => {
             {error}
           </div>
         )}
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-4 p-6 bg-gray-50 dark:bg-gray-800 rounded">
+          {/* Status Filter */}
+          <div>
+            <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Status
+            </label>
+            <select
+              value={filters.status}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, status: e.target.value }))
+              }
+              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            >
+              <option value="">All</option>
+              <option value="Scheduled">Scheduled</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          {/* Patient Filter */}
+          <div>
+            <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Patient
+            </label>
+            <Select
+              value={
+                filters.patientId
+                  ? {
+                      label: `${
+                        patients.find((p) => p._id === filters.patientId)
+                          ?.firstName
+                      } ${
+                        patients.find((p) => p._id === filters.patientId)
+                          ?.lastName
+                      }`,
+                      value: filters.patientId,
+                    }
+                  : null
+              }
+              onChange={(selectedOption: SingleValue<SelectOption>) => {
+                setFilters((prev) => ({
+                  ...prev,
+                  patientId: selectedOption?.value || "",
+                }));
+              }}
+              options={patients.map((patient) => ({
+                label: `${patient.firstName} ${patient.lastName}`,
+                value: patient._id,
+              }))}
+              placeholder="Select Patient"
+            />
+          </div>
+
+          {/* Doctor Filter */}
+          <div>
+            <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Doctor
+            </label>
+            <Select
+              value={
+                filters.doctorId
+                  ? {
+                      label: `Dr. ${
+                        doctors.find((d) => d._id === filters.doctorId)
+                          ?.firstName
+                      } ${
+                        doctors.find((d) => d._id === filters.doctorId)
+                          ?.lastName
+                      }`,
+                      value: filters.doctorId,
+                    }
+                  : null
+              }
+              onChange={(selectedOption: SingleValue<SelectOption>) => {
+                setFilters((prev) => ({
+                  ...prev,
+                  doctorId: selectedOption?.value || "",
+                }));
+              }}
+              options={doctors.map((doctor) => ({
+                label: `Dr. ${doctor.firstName} ${doctor.lastName} - ${doctor.specialty}`,
+                value: doctor._id,
+              }))}
+              placeholder="Select Doctor"
+            />
+          </div>
+
+          {/* Date Range Filters */}
+          <div>
+            <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, startDate: e.target.value }))
+              }
+              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              End Date
+            </label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, endDate: e.target.value }))
+              }
+              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+        </div>
+
+        {/* Filter Buttons */}
+        <div className="p-6">
+          <button
+            onClick={() => fetchAppointments(currentPage, pageSize)}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-300"
+          >
+            Apply Filters
+          </button>
+          <button
+            onClick={clearFilters}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition duration-300 ml-2"
+          >
+            Clear Filters
+          </button>
+        </div>
 
         {/* Appointment Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -349,7 +505,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
               <input
                 name="reason"
                 value={form.reason}
-                onChange={handleChange}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
                 placeholder="Appointment Reason"
                 required
                 className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -364,7 +520,12 @@ const ReceptionAppointmentsPage: React.FC = () => {
               <select
                 name="status"
                 value={form.status}
-                onChange={handleChange}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    status: e.target.value as AppointmentPayload["status"],
+                  })
+                }
                 required
                 className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               >
@@ -387,7 +548,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
             {editingId && (
               <button
                 type="button"
-                onClick={handleCancelEdit}
+                onClick={() => setEditingId(null)}
                 className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition duration-300"
               >
                 Cancel Edit
@@ -418,7 +579,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
                     Status
                   </th>
                   <th className="p-3 text-left border dark:border-gray-600">
-                    QueuePositions
+                    Queue
                   </th>
                   <th className="p-3 text-left border dark:border-gray-600">
                     Actions
@@ -447,7 +608,6 @@ const ReceptionAppointmentsPage: React.FC = () => {
                         ? new Date(appointment?.createdAt).toLocaleString()
                         : "Invalid Date"}
                     </td>
-
                     <td className="p-3 border dark:border-gray-600">
                       {appointment.reason}
                     </td>
@@ -485,12 +645,10 @@ const ReceptionAppointmentsPage: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-
-                {/* No Appointments Message */}
                 {appointmentsData.docs.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center p-4 text-gray-500 dark:text-gray-400"
                     >
                       No appointments found.
@@ -501,6 +659,8 @@ const ReceptionAppointmentsPage: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
         {renderPagination()}
       </div>
     </div>

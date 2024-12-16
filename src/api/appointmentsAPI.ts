@@ -48,19 +48,29 @@ export interface PaginatedAppointments {
 export interface AppointmentQueryParams {
   page?: number;
   limit?: number;
-  status?: string;
   search?: string;
+  status?: string;
+  patientId?: string;
+  doctorId?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 // Modify the getAppointments function to support pagination
-export const getAppointments = async (params: AppointmentQueryParams = {}) => {
-  const { page, limit } = params;
+export const getAppointments = async (params: AppointmentQueryParams) => {
+  const { page, limit, status, patientId, doctorId, startDate, endDate } =
+    params;
 
   try {
     const response = await axiosClient.get("/appointments", {
       params: {
         page,
         limit,
+        status,
+        patientId,
+        doctorId,
+        startDate,
+        endDate,
       },
     });
     return response.data as PaginatedAppointments;
