@@ -12,23 +12,17 @@ import { getPatients, Patient } from "../api/patientsAPI";
 import { getDoctors, Doctor } from "../api/doctorsAPI";
 import { io, Socket } from "socket.io-client";
 import Select, { SingleValue } from "react-select";
+import AppointmentModal from "../components/AppointmentModal"; // Import the new modal
+import * as XLSX from "xlsx";
 
 interface SelectOption {
   label: string;
   value: string;
 }
-
 const ReceptionAppointmentsPage: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [form, setForm] = useState<AppointmentPayload>({
-    patient: null,
-    doctor: null,
-    reason: "",
-    status: "Scheduled",
-    queuePosition: 0,
-  });
 
   const [appointmentsData, setAppointmentsData] =
     useState<PaginatedAppointments>({
@@ -46,8 +40,11 @@ const ReceptionAppointmentsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // State for tracking which appointment is being edited
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // State for modal and editing
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] =
+    useState<Appointment | null>(null);
+
   const [error, setError] = useState<string | null>(null);
 
   const [filters, setFilters] = useState({
@@ -57,6 +54,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
     startDate: "",
     endDate: "",
   });
+
   // Fetch appointments from the backend
   const fetchAppointments = async (page = 1, limit = 10) => {
     try {
@@ -72,6 +70,52 @@ const ReceptionAppointmentsPage: React.FC = () => {
       setAppointmentsData(data);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch appointments");
+    }
+  };
+
+  const exportToExcel = async () => {
+    try {
+      // Fetch ALL appointments without pagination
+      const allAppointmentsData = await getAppointments({
+        page: 1,
+        limit: 100000, // A very large number to get all appointments
+        status: filters.status,
+        patientId: filters.patientId,
+        doctorId: filters.doctorId,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      });
+
+      // Transform appointments data for Excel
+      const excelData = allAppointmentsData.docs.map((appointment) => ({
+        "Patient Name": appointment.patient
+          ? `${appointment.patient.firstName} ${appointment.patient.lastName}`
+          : "Unknown Patient",
+        "Doctor Name": appointment.doctor
+          ? `Dr. ${appointment.doctor.firstName} ${appointment.doctor.lastName}`
+          : "Unknown Doctor",
+        "Appointment Date": appointment.createdAt
+          ? new Date(appointment.createdAt).toLocaleString()
+          : "Invalid Date",
+        Reason: appointment.reason || "",
+        Status: appointment.status || "",
+        "Queue Position": appointment.queuePosition || "N/A",
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      // Create workbook and add worksheet
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Appointments");
+
+      // Generate Excel file
+      XLSX.writeFile(
+        workbook,
+        `Appointments_${new Date().toISOString().split("T")[0]}.xlsx`
+      );
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to export appointments");
     }
   };
 
@@ -95,23 +139,13 @@ const ReceptionAppointmentsPage: React.FC = () => {
     fetchPatientsAndDoctors();
   }, []);
 
+  // Pagination effect
   useEffect(() => {
     fetchAppointments(currentPage, pageSize);
   }, [currentPage, pageSize]);
 
-  const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-  };
-
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize);
-    setCurrentPage(1);
-  };
-
+  // Socket connection effect
   useEffect(() => {
-    fetchAppointments();
-    fetchPatientsAndDoctors();
-
     const socket: Socket = io("http://localhost:3000", {
       withCredentials: true,
       extraHeaders: {
@@ -126,6 +160,72 @@ const ReceptionAppointmentsPage: React.FC = () => {
       socket.disconnect();
     };
   }, []);
+
+  // Handle appointment submission (create or update)
+  const handleAppointmentSubmit = async (
+    appointmentData: AppointmentPayload
+  ) => {
+    try {
+      if (editingAppointment) {
+        // Update existing appointment
+        await updateAppointment(editingAppointment._id, appointmentData);
+      } else {
+        // Create new appointment
+        await createAppointment(appointmentData);
+      }
+
+      // Refetch appointments to get latest data
+      fetchAppointments(currentPage, pageSize);
+
+      // Close modal and reset editing state
+      setIsModalOpen(false);
+      setEditingAppointment(null);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Operation failed");
+    }
+  };
+
+  // Open modal for editing an appointment
+  const handleEdit = (appointment: Appointment) => {
+    setEditingAppointment(appointment);
+    setIsModalOpen(true);
+  };
+
+  // Delete an appointment
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this appointment?")) {
+      try {
+        await deleteAppointment(id);
+        fetchAppointments(currentPage, pageSize);
+      } catch (err: any) {
+        setError(err.response?.data?.error || "Delete failed");
+      }
+    }
+  };
+
+  // Pagination change handlers (existing code)
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
+  };
+
+  // Clear filters
+  const clearFilters = () => {
+    setFilters({
+      status: "",
+      patientId: "",
+      doctorId: "",
+      startDate: "",
+      endDate: "",
+    });
+    fetchAppointments(1, pageSize);
+  };
+
+  // Rendering methods remain the same as in the previous implementation
   const renderPagination = () => {
     const { page, totalPages, hasNextPage, hasPrevPage } = appointmentsData;
 
@@ -175,102 +275,6 @@ const ReceptionAppointmentsPage: React.FC = () => {
     );
   };
 
-  // Handle form input changes
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-
-    if (name === "patient" || name === "doctor") {
-      setForm((prevForm) => ({ ...prevForm, [name]: value || null }));
-    } else {
-      setForm((prevForm) => ({ ...prevForm, [name]: value }));
-    }
-  };
-
-  // Handle form submission (create or update)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate form
-    if (!form.patient || !form.doctor) {
-      setError("Please select both a patient and a doctor.");
-      return;
-    }
-    try {
-      if (editingId) {
-        // Update existing appointment
-        await updateAppointment(editingId, form);
-        setEditingId(null);
-      } else {
-        // Create new appointment
-        await createAppointment(form);
-      }
-
-      setForm({
-        patient: null,
-        doctor: null,
-        reason: "",
-        status: "Scheduled",
-        queuePosition: 0,
-      });
-
-      // Refetch appointments to get latest data
-      fetchAppointments();
-
-      // Clear any previous errors
-      setError(null);
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Operation failed");
-    }
-  };
-
-  // Prepare an appointment for editing
-  const handleEdit = (appointment: Appointment) => {
-    setEditingId(appointment._id);
-    setForm({
-      patient: appointment.patient?._id || null,
-      doctor: appointment.doctor?._id || null,
-      reason: appointment.reason,
-      status: appointment.status,
-      queuePosition: appointment.queuePosition,
-    });
-  };
-
-  // Delete an appointment
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this appointment?")) {
-      try {
-        await deleteAppointment(id);
-        fetchAppointments();
-      } catch (err: any) {
-        setError(err.response?.data?.error || "Delete failed");
-      }
-    }
-  };
-
-  // Cancel editing and reset form
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setForm({
-      patient: null,
-      doctor: null,
-      reason: "",
-      status: "Scheduled",
-      queuePosition: 0,
-    });
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: "",
-      patientId: "",
-      doctorId: "",
-      startDate: "",
-      endDate: "",
-    });
-    fetchAppointments(1, pageSize);
-  };
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg">
@@ -419,145 +423,28 @@ const ReceptionAppointmentsPage: React.FC = () => {
           >
             Clear Filters
           </button>
+          <button
+            onClick={exportToExcel}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition duration-300 ml-2"
+          >
+            Export to Excel
+          </button>
         </div>
 
-        {/* Appointment Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Patient Selection */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Patient
-              </label>
-              <Select
-                name="patient"
-                value={
-                  form.patient
-                    ? {
-                        label: `${
-                          patients.find((p) => p._id === form.patient)
-                            ?.firstName || ""
-                        } ${
-                          patients.find((p) => p._id === form.patient)
-                            ?.lastName || ""
-                        }`,
-                        value: form.patient,
-                      }
-                    : null
-                }
-                onChange={(selectedOption: SingleValue<SelectOption>) => {
-                  setForm((prevForm) => ({
-                    ...prevForm,
-                    patient: selectedOption?.value || null,
-                  }));
-                }}
-                options={patients.map((patient) => ({
-                  label: `${patient.firstName} ${patient.lastName}`,
-                  value: patient._id,
-                }))}
-                placeholder="Select Patient"
-              />
-            </div>
+        {/* Add Appointment Button */}
+        <div className="p-6">
+          <button
+            onClick={() => {
+              setEditingAppointment(null);
+              setIsModalOpen(true);
+            }}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-300"
+          >
+            Add New Appointment
+          </button>
+        </div>
 
-            {/* Doctor Selection */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Doctor
-              </label>
-              <Select
-                name="doctor"
-                value={
-                  form.doctor
-                    ? {
-                        label: `Dr. ${
-                          doctors.find((d) => d._id === form.doctor)
-                            ?.firstName || ""
-                        } ${
-                          doctors.find((d) => d._id === form.doctor)
-                            ?.lastName || ""
-                        } - ${
-                          doctors.find((d) => d._id === form.doctor)
-                            ?.specialty || ""
-                        }`,
-                        value: form.doctor,
-                      }
-                    : null
-                }
-                onChange={(selectedOption: SingleValue<SelectOption>) => {
-                  setForm((prevForm) => ({
-                    ...prevForm,
-                    doctor: selectedOption?.value || null,
-                  }));
-                }}
-                options={doctors.map((doctor) => ({
-                  label: `Dr. ${doctor.firstName} ${doctor.lastName} - ${doctor.specialty}`,
-                  value: doctor._id,
-                }))}
-                placeholder="Select Doctor"
-              />
-            </div>
-
-            {/* Reason Input */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Reason
-              </label>
-              <input
-                name="reason"
-                value={form.reason}
-                onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                placeholder="Appointment Reason"
-                required
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              />
-            </div>
-
-            {/* Status Selection */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Status
-              </label>
-              <select
-                name="status"
-                value={form.status}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    status: e.target.value as AppointmentPayload["status"],
-                  })
-                }
-                required
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                <option value="Scheduled">Scheduled</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Form Action Buttons */}
-          <div className="flex space-x-4 mt-6">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-300"
-            >
-              {editingId ? "Update Appointment" : "Add Appointment"}
-            </button>
-
-            {editingId && (
-              <button
-                type="button"
-                onClick={() => setEditingId(null)}
-                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition duration-300"
-              >
-                Cancel Edit
-              </button>
-            )}
-          </div>
-        </form>
-
-        {/* Appointments Table */}
+        {/* Existing Appointments Table */}
         <div className="p-6">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
@@ -660,8 +547,20 @@ const ReceptionAppointmentsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Pagination */}
         {renderPagination()}
+
+        {/* Appointment Modal */}
+        <AppointmentModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingAppointment(null);
+          }}
+          onSubmit={handleAppointmentSubmit}
+          patients={patients}
+          doctors={doctors}
+          initialAppointment={editingAppointment}
+        />
       </div>
     </div>
   );
