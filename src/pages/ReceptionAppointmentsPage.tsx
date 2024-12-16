@@ -6,13 +6,19 @@ import {
   createAppointment,
   updateAppointment,
   deleteAppointment,
+  PaginatedAppointments,
 } from "../api/appointmentsAPI";
 import { getPatients, Patient } from "../api/patientsAPI";
 import { getDoctors, Doctor } from "../api/doctorsAPI";
-import { io, Socket } from "socket.io-client"; // Import socket.io-client
+import { io, Socket } from "socket.io-client";
+import Select, { SingleValue } from "react-select";
+
+interface SelectOption {
+  label: string;
+  value: string;
+}
 
 const ReceptionAppointmentsPage: React.FC = () => {
-  // State for appointments, patients, doctors, form, and error handling
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -24,19 +30,34 @@ const ReceptionAppointmentsPage: React.FC = () => {
     queuePosition: 0,
   });
 
+  const [appointmentsData, setAppointmentsData] =
+    useState<PaginatedAppointments>({
+      docs: [],
+      totalDocs: 0,
+      limit: 10,
+      page: 1,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPrevPage: false,
+      nextPage: null,
+      prevPage: null,
+    });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // State for tracking which appointment is being edited
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch appointments from the backend
-  const fetchAppointments = async () => {
+  const fetchAppointments = async (page = 1, limit = 10) => {
     try {
-      const data = await getAppointments();
-      // Sort appointments by date, most recent first
-      const sortedAppointments = data.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      setAppointments(sortedAppointments);
+      const data = await getAppointments({
+        page,
+        limit,
+      });
+      setAppointmentsData(data);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch appointments");
     }
@@ -63,10 +84,22 @@ const ReceptionAppointmentsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    fetchAppointments(currentPage, pageSize);
+  }, [currentPage, pageSize]);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
     fetchAppointments();
     fetchPatientsAndDoctors();
 
-    // Set up WebSocket connection
     const socket: Socket = io("http://localhost:3000", {
       withCredentials: true,
       extraHeaders: {
@@ -74,13 +107,61 @@ const ReceptionAppointmentsPage: React.FC = () => {
       },
     });
     socket.on("appointments", (updatedAppointments: Appointment[]) => {
-      setAppointments(updatedAppointments); // Update the appointments list
+      setAppointments(updatedAppointments);
     });
 
     return () => {
-      socket.disconnect(); // Clean up the socket connection on component unmount
+      socket.disconnect();
     };
   }, []);
+  const renderPagination = () => {
+    const { page, totalPages, hasNextPage, hasPrevPage } = appointmentsData;
+
+    return (
+      <div className="flex justify-between items-center mt-4 px-6">
+        <div className="flex items-center space-x-2">
+          <span>Page Size:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+            className="p-2 border rounded"
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handlePageChange(page - 1)}
+            disabled={!hasPrevPage}
+            className={`px-4 py-2 border rounded ${
+              !hasPrevPage
+                ? "bg-gray-200 cursor-not-allowed"
+                : "bg-blue-500 text-white hover:bg-blue-600"
+            }`}
+          >
+            Previous
+          </button>
+          <span className="self-center">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => handlePageChange(page + 1)}
+            disabled={!hasNextPage}
+            className={`px-4 py-2 border rounded ${
+              !hasNextPage
+                ? "bg-gray-200 cursor-not-allowed"
+                : "bg-blue-500 text-white hover:bg-blue-600"
+            }`}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // Handle form input changes
   const handleChange = (
@@ -89,7 +170,6 @@ const ReceptionAppointmentsPage: React.FC = () => {
     const { name, value } = e.target;
 
     if (name === "patient" || name === "doctor") {
-      // Simply set the _id for patient or doctor
       setForm((prevForm) => ({ ...prevForm, [name]: value || null }));
     } else {
       setForm((prevForm) => ({ ...prevForm, [name]: value }));
@@ -193,20 +273,34 @@ const ReceptionAppointmentsPage: React.FC = () => {
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Patient
               </label>
-              <select
+              <Select
                 name="patient"
-                value={form.patient || ""}
-                onChange={handleChange}
-                required
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                <option value="">Select Patient</option>
-                {patients.map((patient) => (
-                  <option key={patient._id} value={patient._id}>
-                    {patient.firstName} {patient.lastName}
-                  </option>
-                ))}
-              </select>
+                value={
+                  form.patient
+                    ? {
+                        label: `${
+                          patients.find((p) => p._id === form.patient)
+                            ?.firstName || ""
+                        } ${
+                          patients.find((p) => p._id === form.patient)
+                            ?.lastName || ""
+                        }`,
+                        value: form.patient,
+                      }
+                    : null
+                }
+                onChange={(selectedOption: SingleValue<SelectOption>) => {
+                  setForm((prevForm) => ({
+                    ...prevForm,
+                    patient: selectedOption?.value || null,
+                  }));
+                }}
+                options={patients.map((patient) => ({
+                  label: `${patient.firstName} ${patient.lastName}`,
+                  value: patient._id,
+                }))}
+                placeholder="Select Patient"
+              />
             </div>
 
             {/* Doctor Selection */}
@@ -214,21 +308,37 @@ const ReceptionAppointmentsPage: React.FC = () => {
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Doctor
               </label>
-              <select
+              <Select
                 name="doctor"
-                value={form.doctor || ""}
-                onChange={handleChange}
-                required
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                <option value="">Select Doctor</option>
-                {doctors.map((doctor) => (
-                  <option key={doctor._id} value={doctor._id}>
-                    Dr. {doctor.firstName} {doctor.lastName} -{" "}
-                    {doctor.specialty}
-                  </option>
-                ))}
-              </select>
+                value={
+                  form.doctor
+                    ? {
+                        label: `Dr. ${
+                          doctors.find((d) => d._id === form.doctor)
+                            ?.firstName || ""
+                        } ${
+                          doctors.find((d) => d._id === form.doctor)
+                            ?.lastName || ""
+                        } - ${
+                          doctors.find((d) => d._id === form.doctor)
+                            ?.specialty || ""
+                        }`,
+                        value: form.doctor,
+                      }
+                    : null
+                }
+                onChange={(selectedOption: SingleValue<SelectOption>) => {
+                  setForm((prevForm) => ({
+                    ...prevForm,
+                    doctor: selectedOption?.value || null,
+                  }));
+                }}
+                options={doctors.map((doctor) => ({
+                  label: `Dr. ${doctor.firstName} ${doctor.lastName} - ${doctor.specialty}`,
+                  value: doctor._id,
+                }))}
+                placeholder="Select Doctor"
+              />
             </div>
 
             {/* Reason Input */}
@@ -316,7 +426,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {appointments.map((appointment) => (
+                {appointmentsData.docs.map((appointment) => (
                   <tr
                     key={appointment._id}
                     className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -377,7 +487,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
                 ))}
 
                 {/* No Appointments Message */}
-                {appointments.length === 0 && (
+                {appointmentsData.docs.length === 0 && (
                   <tr>
                     <td
                       colSpan={6}
@@ -391,6 +501,7 @@ const ReceptionAppointmentsPage: React.FC = () => {
             </table>
           </div>
         </div>
+        {renderPagination()}
       </div>
     </div>
   );

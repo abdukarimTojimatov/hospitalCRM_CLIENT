@@ -10,6 +10,7 @@ interface AuthState {
   role: UserRole;
   userId: string | null;
   token: string | null;
+  email: string | null;
   login: (token: string) => void;
   logout: () => void;
   initializeAuth: () => void;
@@ -22,6 +23,7 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       userId: null,
       token: null,
+      email: null,
 
       login: (token: string) => {
         setToken(token);
@@ -30,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             isAuthenticated: true,
             role: payload.role,
+            email: payload.email,
             userId: payload.id,
             token: token,
           });
@@ -39,6 +42,7 @@ export const useAuthStore = create<AuthState>()(
             role: null,
             userId: null,
             token: null,
+            email: null,
           });
         }
       },
@@ -50,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
           role: null,
           userId: null,
           token: null,
+          email: null,
         });
       },
 
@@ -67,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
                 role: payload.role,
                 userId: payload.id,
                 token: token,
+                email: payload.email,
               });
               return;
             }
@@ -81,6 +87,7 @@ export const useAuthStore = create<AuthState>()(
           role: null,
           userId: null,
           token: null,
+          email: null,
         });
       },
     }),
@@ -91,6 +98,7 @@ export const useAuthStore = create<AuthState>()(
         role: state.role,
         userId: state.userId,
         token: state.token,
+        email: state.email,
       }),
     }
   )

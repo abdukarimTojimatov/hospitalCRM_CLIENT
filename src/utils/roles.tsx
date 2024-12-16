@@ -2,6 +2,7 @@ import * as jwtDecode from "jwt-decode";
 
 interface TokenPayload {
   id: string;
+  email: string;
   role: "CEO" | "Admin" | "Reception";
   exp: number; // Expiration time in seconds
 }

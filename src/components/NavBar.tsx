@@ -5,7 +5,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import ThemeToggle from "./ThemeToggle";
 
 const NavBar: React.FC = () => {
-  const { isAuthenticated, role, logout } = useAuthStore();
+  const { isAuthenticated, role, email, logout } = useAuthStore();
   console.log("isAuthenticated", isAuthenticated);
   const navigate = useNavigate();
 
@@ -66,12 +66,20 @@ const NavBar: React.FC = () => {
       <div className="flex items-center space-x-4">
         <ThemeToggle />
         {isAuthenticated ? (
-          <button
-            onClick={handleLogout}
-            className="text-red-500 hover:underline"
-          >
-            Logout
-          </button>
+          <div className="flex items-center space-x-4">
+            <span className="text-gray-800 dark:text-white">
+              <strong>Email:</strong> {email}
+            </span>
+            <span className="text-gray-800 dark:text-white">
+              <strong>Role:</strong> {role}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="text-red-500 hover:underline"
+            >
+              Logout
+            </button>
+          </div>
         ) : (
           <Link to="/login" className="text-blue-500 hover:underline">
             Login
