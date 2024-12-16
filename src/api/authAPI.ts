@@ -2,7 +2,7 @@
 import axiosClient from "./axiosClient";
 
 interface LoginResponse {
-  access_token: string;
+  token: string;
 }
 
 export const loginUser = async (

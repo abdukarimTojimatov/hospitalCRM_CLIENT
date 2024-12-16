@@ -6,6 +6,7 @@ import ThemeToggle from "./ThemeToggle";
 
 const NavBar: React.FC = () => {
   const { isAuthenticated, role, logout } = useAuthStore();
+  console.log("isAuthenticated", isAuthenticated);
   const navigate = useNavigate();
 
   const handleLogout = () => {

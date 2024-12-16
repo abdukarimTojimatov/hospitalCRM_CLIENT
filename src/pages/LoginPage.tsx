@@ -17,8 +17,8 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     try {
       const data = await loginUser(email, password);
-      console.log("", data.access_token);
-      login(data.access_token);
+
+      login(data.token);
       navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed");

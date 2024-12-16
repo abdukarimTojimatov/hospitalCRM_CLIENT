@@ -62,6 +62,7 @@ const ReceptionPatientsPage: React.FC = () => {
         await updatePatient(editingId, form);
         setEditingId(null);
       } else {
+        console.log("form:::::::::", form);
         await createPatient(form);
       }
       setForm({

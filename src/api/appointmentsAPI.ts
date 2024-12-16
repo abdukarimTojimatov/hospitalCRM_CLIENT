@@ -1,13 +1,37 @@
-// src/api/appointmentsAPI.ts
 import axiosClient from "./axiosClient";
+
+export interface Patient {
+  _id: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface Doctor {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  specialty: string;
+}
 
 export interface Appointment {
   _id: string;
-  patient: string; // Patient ID
-  doctor: string; // Doctor ID
+  patient: Patient | null; // Allow null for form initialization
+  doctor: Doctor | null;
   date: string;
   reason: string;
-  status: string;
+  status: "Scheduled" | "Completed" | "Cancelled";
+  queuePosition: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+// New interface for creating/updating appointments with only _id for patient and doctor
+export interface AppointmentPayload {
+  patient: string | null; // Only _id
+  doctor: string | null; // Only _id
+  reason: string;
+  status: "Scheduled" | "Completed" | "Cancelled";
+  queuePosition: number;
 }
 
 export const getAppointments = async (): Promise<Appointment[]> => {
@@ -16,7 +40,7 @@ export const getAppointments = async (): Promise<Appointment[]> => {
 };
 
 export const createAppointment = async (
-  appointment: Omit<Appointment, "_id">
+  appointment: AppointmentPayload
 ): Promise<Appointment> => {
   const response = await axiosClient.post<Appointment>(
     "/appointments",
@@ -27,7 +51,7 @@ export const createAppointment = async (
 
 export const updateAppointment = async (
   id: string,
-  appointment: Partial<Omit<Appointment, "_id">>
+  appointment: Partial<AppointmentPayload>
 ): Promise<Appointment> => {
   const response = await axiosClient.put<Appointment>(
     `/appointments/${id}`,
