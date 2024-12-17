@@ -311,7 +311,6 @@ const ReceptionAppointmentsPage: React.FC = () => {
               <option value="Cancelled">Cancelled</option>
             </select>
           </div>
-
           {/* Patient Filter */}
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -345,7 +344,6 @@ const ReceptionAppointmentsPage: React.FC = () => {
               placeholder="Select Patient"
             />
           </div>
-
           {/* Doctor Filter */}
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -379,7 +377,6 @@ const ReceptionAppointmentsPage: React.FC = () => {
               placeholder="Select Doctor"
             />
           </div>
-
           {/* Date Range Filters */}
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
